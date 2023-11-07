@@ -2,17 +2,13 @@
 
 import pickle
 import os.path
-import os
+import json
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
-import pyperclip  # <- Add this for clipboard handling
-
-# change directory to the script's directory
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # If modifying these SCOPES, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/tasks']
+SCOPES = ['https://www.googleapis.com/auth/tasks.readonly']
 
 def main():
     creds = None
@@ -38,26 +34,29 @@ def main():
 
     service = build('tasks', 'v1', credentials=creds)
 
-    # Get clipboard content
-    clipboard_content = pyperclip.paste()
+    # Initialize lists for completed and not completed tasks
+    completed_tasks = []
+    not_completed_tasks = []
 
-    # Check clipboard content size
-    if clipboard_content is None or len(clipboard_content) == 0:
-        print("Clipboard content is empty. Exiting...")
-        return
-    elif len(clipboard_content) > 1000:
-        print("Clipboard content too long. Exiting...")
-        return
+    # Retrieve tasks, handle pagination, and sort into completed and not completed lists
+    page_token = None
+    while True:
+        tasks = service.tasks().list(tasklist='@default', pageToken=page_token).execute()
+        for task in tasks.get('items', []):
+            if task.get('status') == 'completed':
+                completed_tasks.append(task)
+            else:
+                not_completed_tasks.append(task)
+        page_token = tasks.get('nextPageToken')
+        if not page_token:
+            break
 
-    # Create a new task
-    new_task = {
-        'title': 'From Slack',
-        'notes': clipboard_content
+    # Output tasks in JSON format
+    output = {
+        "not_completed": not_completed_tasks,
+        "completed": completed_tasks
     }
-    result = service.tasks().insert(tasklist='@default', body=new_task).execute()
-    print(f"Created task with ID: {result['id']}")
-    print(f"Task title: {result['title']}")
-    print(f"Task notes: {result['notes']}")
+    print(json.dumps(output, indent=2))
 
 if __name__ == '__main__':
     main()
