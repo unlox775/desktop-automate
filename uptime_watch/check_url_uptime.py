@@ -30,6 +30,14 @@ CREATE TABLE IF NOT EXISTS website_status (
 # Read the URL from the first command line argument
 website_url = sys.argv[1]
 
+def has_internet():
+    """Check if there's an internet connection by pinging Google."""
+    try:
+        response = requests.get("http://www.google.com", timeout=10)
+        return response.status_code == 200
+    except requests.ConnectionError:
+        return False
+
 # Function to send email
 def send_email(subject, body):
     sender_email = os.environ.get("UPTIMEWATCH_SENDER_EMAIL")
@@ -54,11 +62,17 @@ def check_website(url):
     try:
         response = requests.get(url, timeout=10)
         return 'UP' if response.status_code == 200 else 'DOWN'
-    except requests.RequestException:
+    except Exception as e:  # Catching all exceptions to treat any error as 'DOWN'
+        print(f"Error checking site status: {str(e)}")
         return 'DOWN'
 
 # Check the current status of the website
 current_status = check_website(website_url)
+
+# If it is DOWN, then check if there's an internet connection
+if current_status == 'DOWN' and not has_internet():
+    print("No internet connection. Skipping.")
+    sys.exit()
 
 # Fetch the last status from the database
 cursor.execute("SELECT status FROM website_status WHERE url = ?", (website_url,))
