@@ -41,7 +41,15 @@ The script automatically creates a SQLite database and table for tracking websit
 To regularly check website uptime, add a crontab entry like the following, adjusting paths as necessary:
 
 ```bash
-0/4 * * * * ~/.your-secrets-file.sh ; /path/to/your/python3 /path/to/check_url_uptime.py <URL> 2>&1 | awk '{ print strftime("[%Y-%m-%d %H:%M:%S] - uptime_watch - "), $0; fflush(); }' >> /path/to/your/data/cron.log
+DESKTOP_AUTOMATE=/path/to/desktop-automate
+LOG=/path/to/desktop-automate/data/cron.log
+SECRETS=/path/to/personal.secrets.sh
+DA_PYTHON=/path/to/desktop-automate/venv/bin/python3
+UPTIME=/path/to/desktop-automate/uptime_watch/check_url_uptime.py
+
+
+0/5 * * * * . $SECRETS ; $DA_PYTHON $UPTIME https://site-one.org/ 2>&1 >> $LOG
+0/5 * * * * . $SECRETS ; $DA_PYTHON $UPTIME https://site-two.com/ 2>&1 >> $LOG
 ```
 
 Replace `<URL>` with the website URL you wish to monitor.

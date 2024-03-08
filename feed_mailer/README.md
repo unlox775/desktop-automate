@@ -84,7 +84,13 @@ To run this script automatically at regular intervals, you can set up a cron job
 3. **Add a cron job** to run the script hourly (modify the schedule as needed):
 
     ```
-    0 * * * * /path/to/your/python3 /path/to/send_new_feeds_email.py 'http://example.com/feed' 2>&1 | awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0; fflush(); }' >> /path/to/logfile.log
+    DESKTOP_AUTOMATE=/path/to/desktop-automate
+    LOG=/path/to/desktop-automate/data/cron.log
+    SECRETS=/path/to/personal.secrets.sh
+    DA_PYTHON=/path/to/desktop-automate/venv/bin/python3
+
+    # Email every morning at 9am
+    0/30 * * * * . $SECRETS ; $DA_PYTHON $DESKTOP_AUTOMATE/feed_mailer/send_new_feeds_email.py 9 https://www.feeds.com/rss/aaa111 2>&1 >> $LOG
     ```
 
     Make sure to replace `/path/to/your/python` and `/path/to/send_new_feeds_email.py` with the actual paths on your system.

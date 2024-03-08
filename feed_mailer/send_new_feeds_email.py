@@ -6,7 +6,7 @@ import sys
 import smtplib
 from email.mime.text import MIMEText
 from dateutil import parser
-from datetime import timezone
+from datetime import timezone, timedelta
 
 # Determine script's directory and set database path
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -30,9 +30,34 @@ CREATE TABLE IF NOT EXISTS rss_entries (
 );
 ''')
 
+
+# Get the hour to check feeds from the first argument
+hour_to_send = int(sys.argv[1])
+
+# Get current time and hour
+now = datetime.now()
+
+# Get the last inserted_at time from the database
+cursor.execute("SELECT inserted_at FROM rss_entries ORDER BY datetime(inserted_at) DESC LIMIT 1")
+last_inserted = cursor.fetchone()
+if last_inserted:
+    last_inserted_time = datetime.fromisoformat(last_inserted[0])
+    if now.hour >= hour_to_send and (now - last_inserted_time) >= timedelta(hours=24):
+        # Proceed with checking and sending new entries
+        pass
+    else:
+        print("Not time to check new feeds.")
+        sys.exit()
+else:
+    # No entries, proceed with the script
+    pass
+
+
+
+
 # RSS feed URL
 # Read the feed URL from the first command line argument
-feed_url = sys.argv[1]
+feed_url = sys.argv[2]
 
 # Parse the RSS feed
 feed = feedparser.parse(feed_url)
@@ -46,8 +71,8 @@ for entry in reversed(feed.entries):
     cursor.execute("SELECT url FROM rss_entries WHERE url = ?", (entry.link,))
     if not cursor.fetchone():
         # Insert the new entry into the database
-        cursor.execute("INSERT INTO rss_entries (url, title, description, publication_date, entry_date) VALUES (?, ?, ?, ?, ?)",
-                       (entry.link, entry.title, entry.summary, datetime(*entry.published_parsed[:6]).isoformat(), datetime.now().isoformat()))
+        cursor.execute("INSERT INTO rss_entries (url, title, description, publication_date, entry_date, inserted_at) VALUES (?, ?, ?, ?, ?, ?)",
+               (entry.link, entry.title, entry.summary, datetime(*entry.published_parsed[:6]).isoformat(), datetime.now().isoformat(), datetime.now().isoformat()))
         # Add the new entry to the list
         new_entries.append(entry)
 
