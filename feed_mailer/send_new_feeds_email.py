@@ -7,6 +7,13 @@ import smtplib
 from email.mime.text import MIMEText
 from dateutil import parser
 from datetime import timezone, timedelta
+import argparse
+
+# Set up argument parser
+argparser = argparse.ArgumentParser(description="Send new RSS feed entries via email.")
+argparser.add_argument("hour_to_send", type=int, help="Hour of the day to check and send new feeds (0-23)")
+argparser.add_argument("feed_url", type=str, help="URL of the RSS feed to check")
+args = argparser.parse_args()
 
 # Determine script's directory and set database path
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -26,13 +33,13 @@ CREATE TABLE IF NOT EXISTS rss_entries (
     title TEXT,
     description TEXT,
     publication_date TEXT,
-    entry_date TEXT
+    entry_date TEXT,
+    inserted_at TEXT
 );
 ''')
 
-
-# Get the hour to check feeds from the first argument
-hour_to_send = int(sys.argv[1])
+# Get the hour to check feeds from the arguments
+hour_to_send = args.hour_to_send
 
 # Get current time and hour
 now = datetime.now()
@@ -42,6 +49,7 @@ cursor.execute("SELECT inserted_at FROM rss_entries ORDER BY datetime(inserted_a
 last_inserted = cursor.fetchone()
 if last_inserted:
     last_inserted_time = datetime.fromisoformat(last_inserted[0])
+    print(f"Last inserted_at time: {last_inserted_time}")
     if now.hour >= hour_to_send and (now - last_inserted_time) >= timedelta(hours=24):
         # Proceed with checking and sending new entries
         pass
@@ -52,12 +60,8 @@ else:
     # No entries, proceed with the script
     pass
 
-
-
-
 # RSS feed URL
-# Read the feed URL from the first command line argument
-feed_url = sys.argv[2]
+feed_url = args.feed_url
 
 # Parse the RSS feed
 feed = feedparser.parse(feed_url)
