@@ -7,12 +7,14 @@ import smtplib
 from email.mime.text import MIMEText
 from dateutil import parser
 from datetime import timezone, timedelta
+import csv
 import argparse
 
 # Set up argument parser
 argparser = argparse.ArgumentParser(description="Send new RSS feed entries via email.")
-argparser.add_argument("hour_to_send", type=int, help="Hour of the day to check and send new feeds (0-23)")
-argparser.add_argument("feed_url", type=str, help="URL of the RSS feed to check")
+argparser.add_argument("hour_to_send", type=int, nargs='?', help="Hour of the day to check and send new feeds (0-23)")
+argparser.add_argument("feed_url", type=str, nargs='?', help="URL of the RSS feed to check")
+argparser.add_argument("--sql", action="store_true", help="Open an SQL prompt to query the SQLite database")
 args = argparser.parse_args()
 
 # Determine script's directory and set database path
@@ -37,6 +39,27 @@ CREATE TABLE IF NOT EXISTS rss_entries (
     inserted_at TEXT
 );
 ''')
+
+# If --sql argument is provided, open an SQL prompt
+if args.sql:
+    print("Entering SQL prompt mode. Type your SQL queries below (type 'exit' to quit).")
+    while True:
+        query = input("SQL> ")
+        if query.lower() == 'exit':
+            break
+        try:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            if rows:
+                output = csv.writer(sys.stdout)
+                output.writerow([desc[0] for desc in cursor.description])  # write headers
+                output.writerows(rows)
+            else:
+                print("No results.")
+        except sqlite3.Error as e:
+            print(f"An error occurred: {e}")
+    conn.close()
+    sys.exit()
 
 # Get the hour to check feeds from the arguments
 hour_to_send = args.hour_to_send
