@@ -1,18 +1,21 @@
-# RSS Feed Notifier README
+# RSS Feed Mailer
 
 ## Overview
-This RSS Feed Notifier script provides a simple, free alternative to services like MailBrew. It automatically fetches new entries from a specified RSS feed and sends them to your email. The script is designed to run on a macOS system and stores feed entries in a local SQLite database to avoid sending duplicate notifications.
+This RSS Feed Mailer script provides a simple, free alternative to services like MailBrew. It automatically fetches new entries from a specified RSS feed and sends them to your email. The script stores feed entries in a local SQLite database to avoid sending duplicate notifications.
 
 ## Features
 - **RSS Feed Parsing**: Automatically retrieves new entries from the specified RSS feed URL.
 - **SQLite Database Storage**: Stores feed entries locally to track already notified entries.
 - **Email Notifications**: Sends an email with new feed entries since the last run.
-- **Environment Variables for Configuration**: Uses environment variables for email configuration, making it easy to customize sender, receiver, and SMTP settings.
+- **Command Line Interface**: Includes commands for checking feeds, querying the database, and listing recent entries.
+- **Environment Variables for Configuration**: Uses environment variables for email configuration, making it easy to customize.
+- **Customizable Database Path**: Store your feed database wherever you want.
 
 ## Requirements
 - Python 3
 - `feedparser` Python package
-- Access to an SMTP server (Gmail SMTP recommended)
+- `python-dateutil` package
+- Access to an SMTP server
 - SQLite3 (Included with Python)
 
 ## Installation
@@ -31,7 +34,7 @@ This RSS Feed Notifier script provides a simple, free alternative to services li
     pip3 install feedparser python-dateutil
     ```
 
-4. **Configure environment variables** for email settings. You can set these in your `.bashrc`, `.zshrc`, or `.profile`, or prefix them before running the script:
+4. **Configure environment variables** for email settings:
 
     ```
     export FEEDSEND_SENDER_EMAIL='your_email@example.com'
@@ -43,11 +46,9 @@ This RSS Feed Notifier script provides a simple, free alternative to services li
     export FEEDSEND_SMTP_PASSWORD='your_password'
     ```
 
-    Replace placeholder values with your actual email configuration.
+    You can also set `FEEDSEND_DB_PATH` to override the default database location.
 
-### How to set up GMail App Passwords (Recommended if 2-Step Verification is Enabled):
-
-Instructions courtesy of ChatGPT:
+### How to set up GMail App Passwords (If using Gmail with 2-Step Verification):
 
 1. **Enable 2-Step Verification**:
    - Visit your Google Account's security settings at [Google Account Security](https://myaccount.google.com/security).
@@ -58,46 +59,71 @@ Instructions courtesy of ChatGPT:
    - Once 2-Step Verification is enabled, return to the [Google Account Security](https://myaccount.google.com/security) page.
    - Scroll to the "Signing in to Google" section again and click on "App passwords."
    - You may be prompted to sign in again.
-   - Select the app and device you want to generate the password for. For your case, you might choose "Mail" as the app and "Mac" as the device.
+   - Select "Mail" as the app and your device type.
    - Click "Generate." Google will display a 16-character password.
-   - Use this app password in your script as the `smtp_password`.
+   - Use this app password in your script as the `FEEDSEND_SMTP_PASSWORD`.
 
 ## Usage
 
-Run the script from the command line, specifying the RSS feed URL as an argument:
+### Command Line Interface
+
+The script provides a command-line interface with several commands:
+
+#### Check for new feed entries
 
 ```
-python3 send_new_feeds_email.py 'http://example.com/feed'
+python3 send_new_feeds_email.py check --feed 'https://example.com/feed'
 ```
 
-## Cron Job Setup
+Optional arguments:
+- `--hour HOUR`: Hour of the day to check feeds (default: 9 or `FEEDSEND_HOUR` env variable)
+- `--force`: Force sending even if time conditions aren't met
+- `--db-path PATH`: Custom path to the SQLite database
+- `--verbose` or `-v`: Show verbose output
 
-To run this script automatically at regular intervals, you can set up a cron job on macOS:
+#### Query the database with SQL
 
-1. **Open Terminal**.
-2. **Edit your crontab**:
+```
+python3 send_new_feeds_email.py sql
+```
+
+Optional arguments:
+- `--db-path PATH`: Custom path to the SQLite database
+
+#### List recent entries
+
+```
+python3 send_new_feeds_email.py list
+```
+
+Optional arguments:
+- `--limit N`: Number of entries to show (default: 10)
+- `--db-path PATH`: Custom path to the SQLite database
+
+### Cron Job Setup
+
+To run this script automatically at regular intervals using the provided wrapper script:
+
+1. Configure cron to run the script at the desired time:
 
     ```
-    crontab -e
-    ```
-
-3. **Add a cron job** to run the script hourly (modify the schedule as needed):
-
-    ```
-    DESKTOP_AUTOMATE=/path/to/desktop-automate
-    LOG=/path/to/desktop-automate/data/cron.log
-    SECRETS=/path/to/personal.secrets.sh
-    DA_PYTHON=/path/to/desktop-automate/venv/bin/python3
-
     # Email every morning at 9am
-    0/30 * * * * . $SECRETS ; $DA_PYTHON $DESKTOP_AUTOMATE/feed_mailer/send_new_feeds_email.py 9 https://www.feeds.com/rss/aaa111 2>&1 >> $LOG
+    0 9 * * * /path/to/desktop-automate/cron_run_w_log.sh /path/to/desktop-automate/feed_mailer/send_new_feeds_email.py check --feed https://example.com/feed
     ```
 
-    Make sure to replace `/path/to/your/python` and `/path/to/send_new_feeds_email.py` with the actual paths on your system.
+Alternatively, you can set environment variables in your crontab:
+
+```
+FEEDSEND_SENDER_EMAIL=your_email@example.com
+FEEDSEND_RECEIVER_EMAIL=recipient_email@example.com
+# ...other environment variables...
+
+0 9 * * * cd /path/to/desktop-automate && ./venv/bin/python feed_mailer/send_new_feeds_email.py check --feed https://example.com/feed
+```
 
 ## Notes
 
 - The first time you run the script, it will send notifications for all current entries in the feed. Subsequent runs will only notify you about new entries.
 - Ensure your SMTP settings are correctly configured to prevent email sending errors.
-- For Gmail SMTP, you may need to create an App Password if you have 2-Step Verification enabled on your Google account (see above).
-- If you use for more than one feed, technically it will skip sending a feed entry from one feed if it's already in the database from another feed. This is because the script uses the entry's URL as a unique identifier. If you want to use this for multiple feeds, you may want to modify the database schema to include the feed URL as part of the unique identifier.
+- If you use this for multiple feeds, you might want to set up separate database files for each feed by using the `--db-path` option.
+- The script uses the entry's URL as the unique identifier in the database.
