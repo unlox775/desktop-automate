@@ -191,35 +191,44 @@ def check_and_send_feeds(db_path, feed_url, hour_to_send, force=False, verbose=F
         
         # List to store new entries
         new_entries = []
+        entries_to_insert = []
         
         # Process entries in reverse order to start with the oldest
         for entry in reversed(feed.entries):
             # Check if the entry is already in the database
             cursor.execute("SELECT url FROM rss_entries WHERE url = ?", (entry.link,))
             if not cursor.fetchone():
-                # Insert the new entry into the database
-                cursor.execute(
-                    """INSERT INTO rss_entries 
-                       (url, title, description, publication_date, entry_date, inserted_at) 
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (
-                        entry.link, 
-                        entry.title, 
-                        entry.summary, 
-                        datetime(*entry.published_parsed[:6]).isoformat(), 
-                        datetime.now().isoformat(), 
-                        datetime.now().isoformat()
-                    )
-                )
+                # Store the entry data to be inserted later
+                entries_to_insert.append((
+                    entry.link, 
+                    entry.title, 
+                    entry.summary, 
+                    datetime(*entry.published_parsed[:6]).isoformat(), 
+                    datetime.now().isoformat(), 
+                    datetime.now().isoformat()
+                ))
                 # Add the new entry to the list
                 new_entries.append(entry)
         
-        # Commit changes to database
-        conn.commit()
-        
         # Send email if there are new entries
         if new_entries:
-            send_entries_email(new_entries)
+            email_success = send_entries_email(new_entries)
+            
+            # Only commit changes to database if email was sent successfully
+            if email_success:
+                # Insert all entries into the database
+                for entry_data in entries_to_insert:
+                    cursor.execute(
+                        """INSERT INTO rss_entries 
+                           (url, title, description, publication_date, entry_date, inserted_at) 
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        entry_data
+                    )
+                # Commit changes to database
+                conn.commit()
+                logger.info(f"Committed {len(new_entries)} new entries to database")
+            else:
+                logger.warning("Email sending failed, not committing entries to database")
         else:
             logger.info("No new feed entries found.")
         
@@ -242,7 +251,7 @@ def send_entries_email(entries):
     if not all([sender_email, receiver_email, smtp_server, smtp_username, smtp_password]):
         logger.error("Email configuration incomplete. Please set all FEEDSEND_* environment variables.")
         logger.info(f"Found {len(entries)} new entries, but email was not sent due to missing configuration.")
-        return
+        return False
     
     # Compile new entries into an email
     email_body = ""
@@ -269,8 +278,10 @@ def send_entries_email(entries):
             server.login(smtp_username, smtp_password)
             server.sendmail(sender_email, receiver_email, message.as_string())
         logger.info(f"Sent email with {len(entries)} new feed entries")
+        return True
     except Exception as e:
         logger.error(f"Failed to send email: {str(e)}")
+        return False
 
 def main():
     """Main entry point for the script."""

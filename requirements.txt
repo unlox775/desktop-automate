@@ -1,0 +1,24 @@
+# Core dependencies
+feedparser>=6.0.0
+python-dateutil>=2.8.0
+requests>=2.25.0
+
+# Google API dependencies
+google-auth>=2.0.0
+google-auth-oauthlib>=0.4.0
+google-api-python-client>=2.0.0
+
+# HTML processing
+beautifulsoup4>=4.9.0
+
+# Basic requirements are already in Python standard library:
+# - sqlite3
+# - datetime
+# - smtplib
+# - email
+# - os
+# - sys
+# - csv
+# - argparse
+# - logging
+# - re
